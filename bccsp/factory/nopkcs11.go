@@ -12,6 +12,7 @@ import (
 	"reflect"
 
 	"github.com/hyperledger/fabric/bccsp"
+	"github.com/hyperledger/fabric/bccsp/vault"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
 )
@@ -20,8 +21,9 @@ const pkcs11Enabled = false
 
 // FactoryOpts holds configuration information used to initialize factory implementations
 type FactoryOpts struct {
-	Default string  `json:"default" yaml:"Default"`
-	SW      *SwOpts `json:"SW,omitempty" yaml:"SW,omitempty"`
+	Default string           `json:"default" yaml:"Default"`
+	SW      *SwOpts          `json:"SW,omitempty" yaml:"SW,omitempty"`
+	VAULT   *vault.VaultOpts `json:"VAULT,omitempty" yaml:"VAULT,omitempty"`
 }
 
 // InitFactories must be called before using factory interfaces
@@ -60,6 +62,16 @@ func initFactories(config *FactoryOpts) error {
 		}
 	}
 
+	// HashiCorp Vault Transit-Based BCCSP
+	if config.Default == "VAULT" && config.VAULT != nil {
+		f := &VaultFactory{}
+		var err error
+		defaultBCCSP, err = initBCCSP(f, config)
+		if err != nil {
+			return errors.Wrapf(err, "Failed initializing VAULT.BCCSP")
+		}
+	}
+
 	if defaultBCCSP == nil {
 		return errors.Errorf("Could not find default `%s` BCCSP", config.Default)
 	}
@@ -73,6 +85,8 @@ func GetBCCSPFromOpts(config *FactoryOpts) (bccsp.BCCSP, error) {
 	switch config.Default {
 	case "SW":
 		f = &SWFactory{}
+	case "VAULT":
+		f = &VaultFactory{}
 	default:
 		return nil, errors.Errorf("Could not find BCCSP, no '%s' provider", config.Default)
 	}

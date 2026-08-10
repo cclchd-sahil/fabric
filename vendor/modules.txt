@@ -76,6 +76,9 @@ github.com/beorn7/perks/quantile
 # github.com/bits-and-blooms/bitset v1.20.0
 ## explicit; go 1.16
 github.com/bits-and-blooms/bitset
+# github.com/cenkalti/backoff/v4 v4.3.0
+## explicit; go 1.18
+github.com/cenkalti/backoff/v4
 # github.com/cespare/xxhash/v2 v2.3.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
@@ -200,6 +203,12 @@ github.com/fjl/jsonw
 # github.com/fsnotify/fsnotify v1.6.0
 ## explicit; go 1.16
 github.com/fsnotify/fsnotify
+# github.com/go-jose/go-jose/v4 v4.1.4
+## explicit; go 1.24.0
+github.com/go-jose/go-jose/v4
+github.com/go-jose/go-jose/v4/cipher
+github.com/go-jose/go-jose/v4/json
+github.com/go-jose/go-jose/v4/jwt
 # github.com/go-kit/kit v0.10.0
 ## explicit; go 1.13
 github.com/go-kit/kit/log
@@ -282,6 +291,30 @@ github.com/hansrajrami/fabric/mst/relay/outbox
 github.com/hansrajrami/fabric/mst/relay/sender
 github.com/hansrajrami/fabric/mst/relay/txmodel
 github.com/hansrajrami/fabric/mst/relay/verifylib
+# github.com/hashicorp/errwrap v1.1.0
+## explicit
+github.com/hashicorp/errwrap
+# github.com/hashicorp/go-cleanhttp v0.5.2
+## explicit; go 1.13
+github.com/hashicorp/go-cleanhttp
+# github.com/hashicorp/go-multierror v1.1.1
+## explicit; go 1.13
+github.com/hashicorp/go-multierror
+# github.com/hashicorp/go-retryablehttp v0.7.7
+## explicit; go 1.19
+github.com/hashicorp/go-retryablehttp
+# github.com/hashicorp/go-rootcerts v1.0.2
+## explicit; go 1.12
+github.com/hashicorp/go-rootcerts
+# github.com/hashicorp/go-secure-stdlib/parseutil v0.1.6
+## explicit; go 1.16
+github.com/hashicorp/go-secure-stdlib/parseutil
+# github.com/hashicorp/go-secure-stdlib/strutil v0.1.2
+## explicit; go 1.16
+github.com/hashicorp/go-secure-stdlib/strutil
+# github.com/hashicorp/go-sockaddr v1.0.2
+## explicit
+github.com/hashicorp/go-sockaddr
 # github.com/hashicorp/go-version v1.4.0
 ## explicit
 github.com/hashicorp/go-version
@@ -297,6 +330,9 @@ github.com/hashicorp/hcl/hcl/token
 github.com/hashicorp/hcl/json/parser
 github.com/hashicorp/hcl/json/scanner
 github.com/hashicorp/hcl/json/token
+# github.com/hashicorp/vault/api v1.15.0
+## explicit; go 1.21
+github.com/hashicorp/vault/api
 # github.com/holiman/uint256 v1.3.2
 ## explicit; go 1.19
 github.com/holiman/uint256
@@ -373,7 +409,10 @@ github.com/mattn/go-runewidth
 # github.com/miekg/pkcs11 v1.1.2
 ## explicit; go 1.12
 github.com/miekg/pkcs11
-# github.com/mitchellh/mapstructure v1.4.3
+# github.com/mitchellh/go-homedir v1.1.0
+## explicit
+github.com/mitchellh/go-homedir
+# github.com/mitchellh/mapstructure v1.5.0
 ## explicit; go 1.14
 github.com/mitchellh/mapstructure
 # github.com/moby/docker-image-spec v1.3.1
@@ -499,6 +538,9 @@ github.com/robfig/cron/v3
 # github.com/rogpeppe/go-internal v1.14.1
 ## explicit; go 1.23
 github.com/rogpeppe/go-internal/fmtsort
+# github.com/ryanuber/go-glob v1.0.0
+## explicit
+github.com/ryanuber/go-glob
 # github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible
 ## explicit
 github.com/shirou/gopsutil/cpu
@@ -704,6 +746,9 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
+# golang.org/x/time v0.11.0
+## explicit; go 1.23.0
+golang.org/x/time/rate
 # golang.org/x/tools v0.44.0
 ## explicit; go 1.25.0
 golang.org/x/tools/cover
