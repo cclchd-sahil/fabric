@@ -65,12 +65,13 @@ type File struct {
 	} `json:"fabric"`
 
 	EVM struct {
-		RPCURL          string `json:"rpcURL"`
-		ContractAddress string `json:"contractAddress"`
-		ChainID         uint64 `json:"chainID"`
-		GasLimit        uint64 `json:"gasLimit"`
-		TipCapGwei      uint64 `json:"tipCapGwei"`
-		Confirmations   uint64 `json:"confirmations"`
+		RPCURL                string `json:"rpcURL"`
+		InsecureSkipTLSVerify bool   `json:"insecureSkipTLSVerify"`
+		ContractAddress       string `json:"contractAddress"`
+		ChainID               uint64 `json:"chainID"`
+		GasLimit              uint64 `json:"gasLimit"`
+		TipCapGwei            uint64 `json:"tipCapGwei"`
+		Confirmations         uint64 `json:"confirmations"`
 		// MinBalanceGwei: log loudly when the relayer's gas balance drops
 		// below this (0 disables the watcher; the metrics gauge is always on).
 		MinBalanceGwei uint64 `json:"minBalanceGwei"`
@@ -189,12 +190,13 @@ func (f *File) EVMConfig() (evm.Config, error) {
 		return evm.Config{}, fmt.Errorf("config: %s environment variable is required", EnvRelayerKey)
 	}
 	return evm.Config{
-		RPCURL:          f.EVM.RPCURL,
-		ContractAddress: f.EVM.ContractAddress,
-		PrivateKeyHex:   key,
-		ChainID:         f.EVM.ChainID,
-		GasLimit:        f.EVM.GasLimit,
-		TipCapGwei:      f.EVM.TipCapGwei,
+		RPCURL:                f.EVM.RPCURL,
+		InsecureSkipTLSVerify: f.EVM.InsecureSkipTLSVerify,
+		ContractAddress:       f.EVM.ContractAddress,
+		PrivateKeyHex:         key,
+		ChainID:               f.EVM.ChainID,
+		GasLimit:              f.EVM.GasLimit,
+		TipCapGwei:            f.EVM.TipCapGwei,
 	}, nil
 }
 

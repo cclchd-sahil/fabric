@@ -8,6 +8,8 @@ local relayer. It wraps what you would otherwise do with raw
 All commands take `-C/--channelID` and, optionally, `--peerAddresses` /
 `--tlsRootCertFiles` (default: the local peer from `core.yaml`). Commands that
 read the MST chain also accept `--rpc` (default: `mst.evm.rpcURL`).
+For HTTPS/WSS endpoints with private/self-signed CAs, those commands also honor
+`mst.evm.insecureSkipTLSVerify` from `core.yaml` (DEV/TEST only).
 
 ## Query the anchor-status ledger fact (`mstscc`)
 
@@ -147,14 +149,14 @@ allowlist enabled. See [`PHASE-1.5.md`](PHASE-1.5.md) for the allowlist model.
 MST anchoring is covered by layered automated tests; no single suite spins up a
 full live network, so the layers below together cover every component:
 
-| Layer | Where | Covers |
-|---|---|---|
-| Channel-config value | `common/channelconfig/mstanchor_test.go` | parse/validate/round-trip of the `MSTAnchor` config value, incl. zero-address and cadence-consistency rejection |
-| System chaincode | `core/scc/mstscc/mstscc_test.go` | record/query/idempotency, list/count, channel-enablement gating |
-| Simulated pipeline e2e | `internal/pkg/mstanchor/e2e_test.go` | real capture → outbox → sender → `mstscc` write-back with in-memory MST + channel-config gating + per-channel isolation |
-| EVM contract (Go) | `mst/relay/evm/integration_test.go` | real chain: anchor/get/root/sender pipeline **and the relayer allowlist `setRelayer` path** (env-gated on `MST_EVM_RPC`; runs in CI's hardhat job) |
-| EVM contract (Solidity) | `mst/anchor-contracts/test/MSTAnchor.test.ts` | contract semantics incl. allowlist, run by hardhat in CI |
-| `peer mst` commands | `internal/peer/mst/*_test.go` | each command's proposal construction, output, and error paths (fake endorser + test MSP); helpers and metrics rendering |
+| Layer                   | Where                                         | Covers                                                                                                                                             |
+| ----------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Channel-config value    | `common/channelconfig/mstanchor_test.go`      | parse/validate/round-trip of the `MSTAnchor` config value, incl. zero-address and cadence-consistency rejection                                    |
+| System chaincode        | `core/scc/mstscc/mstscc_test.go`              | record/query/idempotency, list/count, channel-enablement gating                                                                                    |
+| Simulated pipeline e2e  | `internal/pkg/mstanchor/e2e_test.go`          | real capture → outbox → sender → `mstscc` write-back with in-memory MST + channel-config gating + per-channel isolation                            |
+| EVM contract (Go)       | `mst/relay/evm/integration_test.go`           | real chain: anchor/get/root/sender pipeline **and the relayer allowlist `setRelayer` path** (env-gated on `MST_EVM_RPC`; runs in CI's hardhat job) |
+| EVM contract (Solidity) | `mst/anchor-contracts/test/MSTAnchor.test.ts` | contract semantics incl. allowlist, run by hardhat in CI                                                                                           |
+| `peer mst` commands     | `internal/peer/mst/*_test.go`                 | each command's proposal construction, output, and error paths (fake endorser + test MSP); helpers and metrics rendering                            |
 
 The **full live-network run** (real peers + orderer + a live EVM node in one
 process) is the documented manual walkthrough in

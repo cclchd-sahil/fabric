@@ -3,9 +3,12 @@ package evm
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"math/big"
+	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +18,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/gorilla/websocket"
 )
 
 // Config locates the MST chain and the relayer's key. Everything is plain
@@ -34,6 +39,9 @@ type Config struct {
 	GasLimit uint64
 	// TipCapGwei is the priority fee; 0 lets the node suggest.
 	TipCapGwei uint64
+	// InsecureSkipTLSVerify disables TLS certificate verification for HTTPS/WSS
+	// RPC endpoints. Use only in development/test environments.
+	InsecureSkipTLSVerify bool
 	// ReceiptPollInterval controls confirmation polling (default 500ms).
 	ReceiptPollInterval time.Duration
 }
@@ -73,7 +81,7 @@ func Dial(ctx context.Context, cfg Config) (*Client, error) {
 	if cfg.GasLimit == 0 {
 		cfg.GasLimit = defaultGasLimit
 	}
-	eth, err := ethclient.DialContext(ctx, cfg.RPCURL)
+	eth, err := dialETHClient(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("evm: dial %s: %w", cfg.RPCURL, err)
 	}
@@ -113,6 +121,36 @@ func Dial(ctx context.Context, cfg Config) (*Client, error) {
 		signer:   types.LatestSignerForChainID(chainID),
 		cfg:      cfg,
 	}, nil
+}
+
+func dialETHClient(ctx context.Context, cfg Config) (*ethclient.Client, error) {
+	if !cfg.InsecureSkipTLSVerify {
+		return ethclient.DialContext(ctx, cfg.RPCURL)
+	}
+
+	u, err := url.Parse(cfg.RPCURL)
+	if err != nil {
+		return nil, fmt.Errorf("evm: parse RPC URL: %w", err)
+	}
+
+	var opts []rpc.ClientOption
+	tlsCfg := &tls.Config{InsecureSkipVerify: true}
+	switch strings.ToLower(u.Scheme) {
+	case "http", "https":
+		opts = append(opts, rpc.WithHTTPClient(&http.Client{
+			Transport: &http.Transport{TLSClientConfig: tlsCfg},
+		}))
+	case "ws", "wss":
+		opts = append(opts, rpc.WithWebsocketDialer(websocket.Dialer{TLSClientConfig: tlsCfg}))
+	default:
+		return nil, fmt.Errorf("evm: unsupported RPC URL scheme %q for insecure TLS override", u.Scheme)
+	}
+
+	rpcClient, err := rpc.DialOptions(ctx, cfg.RPCURL, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return ethclient.NewClient(rpcClient), nil
 }
 
 // Binding pairs the shared Client (one relayer account, one serialized nonce

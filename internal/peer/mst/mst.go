@@ -240,10 +240,11 @@ func evmConfigFor(mstCfg *channelconfig.MSTAnchorConfig) (evm.Config, error) {
 		return evm.Config{}, fmt.Errorf("no MST RPC endpoint: set --rpc or mst.evm.rpcURL")
 	}
 	return evm.Config{
-		RPCURL:          rpc,
-		ContractAddress: mstCfg.ContractAddress,
-		ChainID:         mstCfg.ChainID,
-		PrivateKeyHex:   dummyReadKey,
+		RPCURL:                rpc,
+		ContractAddress:       mstCfg.ContractAddress,
+		ChainID:               mstCfg.ChainID,
+		InsecureSkipTLSVerify: viper.GetBool("mst.evm.insecureSkipTLSVerify"),
+		PrivateKeyHex:         dummyReadKey,
 	}, nil
 }
 

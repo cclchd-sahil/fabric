@@ -55,9 +55,10 @@ type Config struct {
 	// peer-local operational knobs.
 
 	EVM struct {
-		RPCURL     string
-		GasLimit   uint64
-		TipCapGwei uint64
+		RPCURL                string
+		InsecureSkipTLSVerify bool
+		GasLimit              uint64
+		TipCapGwei            uint64
 		// MinBalanceGwei: log loudly when the relayer's gas balance drops
 		// below this (0 disables the watcher; the metrics gauge is always
 		// exposed regardless).
@@ -138,6 +139,7 @@ func FromViper(v *viper.Viper) (*Config, error) {
 	c.DefaultStartBlock = uint64(v.GetInt64("mst.defaultStartBlock"))
 
 	c.EVM.RPCURL = v.GetString("mst.evm.rpcURL")
+	c.EVM.InsecureSkipTLSVerify = v.GetBool("mst.evm.insecureSkipTLSVerify")
 	c.EVM.GasLimit = uint64(v.GetInt64("mst.evm.gasLimit"))
 	c.EVM.TipCapGwei = uint64(v.GetInt64("mst.evm.tipCapGwei"))
 	c.EVM.MinBalanceGwei = uint64(v.GetInt64("mst.evm.minBalanceGwei"))
@@ -237,10 +239,11 @@ func (c *Config) EVMConfig() (evm.Config, error) {
 		return evm.Config{}, fmt.Errorf("mstanchor: %s environment variable is required when mst.enabled is true", EnvRelayerKey)
 	}
 	return evm.Config{
-		RPCURL:        c.EVM.RPCURL,
-		PrivateKeyHex: key,
-		GasLimit:      c.EVM.GasLimit,
-		TipCapGwei:    c.EVM.TipCapGwei,
+		RPCURL:                c.EVM.RPCURL,
+		InsecureSkipTLSVerify: c.EVM.InsecureSkipTLSVerify,
+		PrivateKeyHex:         key,
+		GasLimit:              c.EVM.GasLimit,
+		TipCapGwei:            c.EVM.TipCapGwei,
 	}, nil
 }
 

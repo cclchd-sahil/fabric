@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/ethereum/go-ethereum v1.17.4
+	github.com/gorilla/websocket v1.4.2
 	github.com/hansrajrami/fabric/mst/canonical v0.0.0
 	github.com/hansrajrami/fabric/mst/fabric-chaincode/proofhelper v0.0.0-00010101000000-000000000000
 	github.com/hyperledger/fabric-gateway v1.11.0
@@ -30,7 +31,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
-	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect
 	github.com/miekg/pkcs11 v1.1.2 // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect

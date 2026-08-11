@@ -53,7 +53,13 @@ func TestEvmConfigForResolvesRPC(t *testing.T) {
 	require.Equal(t, "http://core:8545", cfg.RPCURL)
 	require.Equal(t, mstCfg.ContractAddress, cfg.ContractAddress)
 	require.Equal(t, mstCfg.ChainID, cfg.ChainID)
+	require.False(t, cfg.InsecureSkipTLSVerify)
 	require.NotEmpty(t, cfg.PrivateKeyHex, "a dummy read key is set")
+
+	viper.Set("mst.evm.insecureSkipTLSVerify", true)
+	cfg, err = evmConfigFor(mstCfg)
+	require.NoError(t, err)
+	require.True(t, cfg.InsecureSkipTLSVerify)
 
 	// --rpc flag wins over core.yaml.
 	rpcOverride = "http://flag:9545"

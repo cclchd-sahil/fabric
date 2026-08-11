@@ -50,6 +50,7 @@ func TestFullConfig(t *testing.T) {
 	v.Set("mst.channels", []string{"mychannel"})
 	v.Set("mst.defaultStartBlock", 5)
 	v.Set("mst.evm.rpcURL", "http://127.0.0.1:8545")
+	v.Set("mst.evm.insecureSkipTLSVerify", true)
 	v.Set("mst.evm.minBalanceGwei", 500000)
 	v.Set("mst.sender.workers", 8)
 	v.Set("mst.writeback.mspID", "Org1MSP")
@@ -62,6 +63,7 @@ func TestFullConfig(t *testing.T) {
 	require.True(t, cfg.channelAllowed("mychannel"))
 	require.False(t, cfg.channelAllowed("otherchannel"))
 	require.Equal(t, uint64(500000), cfg.EVM.MinBalanceGwei)
+	require.True(t, cfg.EVM.InsecureSkipTLSVerify)
 
 	// The anchoring policy is channel-governed: the per-channel builders take
 	// capture scope, batch strategy, and confirmations from the channel config,
@@ -111,6 +113,14 @@ func TestEVMKeyFromEnvOnly(t *testing.T) {
 	ec, err := cfg.EVMConfig()
 	require.NoError(t, err)
 	require.Equal(t, "aa", ec.PrivateKeyHex)
+	require.False(t, ec.InsecureSkipTLSVerify)
+
+	v.Set("mst.evm.insecureSkipTLSVerify", true)
+	cfg, err = FromViper(v)
+	require.NoError(t, err)
+	ec, err = cfg.EVMConfig()
+	require.NoError(t, err)
+	require.True(t, ec.InsecureSkipTLSVerify)
 }
 
 func TestChannelAllowedEmptyMeansAll(t *testing.T) {

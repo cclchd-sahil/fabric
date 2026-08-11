@@ -15,14 +15,14 @@ For the design rationale see [PHASE-1.5.md](PHASE-1.5.md) and
 
 ## 0. What you are deploying
 
-| Piece | Where | Purpose |
-|---|---|---|
-| `MSTAnchor` contract **behind a proxy** | MST chain (EVM), **one per channel** | public record of commitments / batch roots at a stable, upgradeable address |
-| `V2_5_MSTANCHOR` capability + `MSTAnchor` value | channel configuration | all-org-agreed enablement + anchoring policy |
-| `mstscc` system chaincode | built into the peer (opt-in) | write-back target ("is tx X anchored?"), peer-role gated |
-| business chaincodes + `proofhelper` | your channels | opt-in: emit `MSTProofRequest` per tx (not needed in capture mode `all`) |
-| the embedded relayer | inside the MST-enabled peer | capture → outbox → anchor → write-back |
-| `peer mst` / `mst-verify` | anywhere | operator helpers / independent verification |
+| Piece                                           | Where                                | Purpose                                                                     |
+| ----------------------------------------------- | ------------------------------------ | --------------------------------------------------------------------------- |
+| `MSTAnchor` contract **behind a proxy**         | MST chain (EVM), **one per channel** | public record of commitments / batch roots at a stable, upgradeable address |
+| `V2_5_MSTANCHOR` capability + `MSTAnchor` value | channel configuration                | all-org-agreed enablement + anchoring policy                                |
+| `mstscc` system chaincode                       | built into the peer (opt-in)         | write-back target ("is tx X anchored?"), peer-role gated                    |
+| business chaincodes + `proofhelper`             | your channels                        | opt-in: emit `MSTProofRequest` per tx (not needed in capture mode `all`)    |
+| the embedded relayer                            | inside the MST-enabled peer          | capture → outbox → anchor → write-back                                      |
+| `peer mst` / `mst-verify`                       | anywhere                             | operator helpers / independent verification                                 |
 
 ## 1. Prerequisites
 
@@ -69,24 +69,24 @@ channel creation, declare it in `configtx.yaml` (both the capability and the val
 
 ```yaml
 Capabilities:
-    Application: &ApplicationCapabilities
-        V2_5: true
-        V2_5_MSTANCHOR: true          # REQUIRED for the MSTAnchor value below
+  Application: &ApplicationCapabilities
+    V2_5: true
+    V2_5_MSTANCHOR: true # REQUIRED for the MSTAnchor value below
 
 Application:
-    Capabilities:
-        <<: *ApplicationCapabilities
-    MSTAnchor:
-        Enabled: true
-        ContractAddress: "0xYourPerChannelProxyAddress…"   # the PROXY from step 2
-        ChainID: 1337
-        CaptureMode: opt-in           # or "all"
-        # IncludeChaincodes: [myapp]  # "all"-mode scope
-        # ExcludeChaincodes: []
-        BatchStrategy: individual     # or "merkle"
-        Confirmations: 1
-        # Flush cadence: per-tx | batch | interval | cron
-        CadenceMode: per-tx
+  Capabilities:
+    <<: *ApplicationCapabilities
+  MSTAnchor:
+    Enabled: true
+    ContractAddress: "0xYourPerChannelProxyAddress…" # the PROXY from step 2
+    ChainID: 1337
+    CaptureMode: opt-in # or "all"
+    # IncludeChaincodes: [myapp]  # "all"-mode scope
+    # ExcludeChaincodes: []
+    BatchStrategy: individual # or "merkle"
+    Confirmations: 1
+    # Flush cadence: per-tx | batch | interval | cron
+    CadenceMode: per-tx
 ```
 
 For an **existing** channel, make the same change as a channel-config update (add the
@@ -116,6 +116,7 @@ mst:
     channels: []                        # empty = every joined channel that enabled MST
     evm:
         rpcURL: https://<mst-rpc>       # peer-local: the one chain this peer anchors to
+      insecureSkipTLSVerify: false    # DEV/TEST ONLY for self-signed/unknown CAs
         minBalanceGwei: 100000000       # alert threshold; 0 = off
     sender:
         workers: 4
@@ -130,6 +131,9 @@ Note what is **not** here: contract address, chain-id policy, capture mode, batc
 strategy, confirmations, and cadence are all channel-governed (step 3). `core.yaml`
 keeps only peer-local plumbing. `ChainID` from the channel config is validated against
 the chain the peer's RPC reports; a mismatch means the peer refuses that channel.
+If your HTTPS/WSS RPC endpoint uses a private/self-signed CA, prefer installing that
+CA in the peer trust store. As a temporary workaround in non-production environments,
+set `mst.evm.insecureSkipTLSVerify: true`.
 
 Then start it:
 
@@ -179,11 +183,11 @@ See [CLI.md](CLI.md) for the full `peer mst` surface (`is-anchored`, `list`, `co
 
 ## 7. Choosing capture, batching, and cadence (all channel-governed)
 
-| Setting | Options | Notes |
-|---|---|---|
-| `CaptureMode` | `opt-in` (default) / `all` | `all` anchors EVERY valid tx (non-opted ones with the empty-payload hash — existence proof); scope with `IncludeChaincodes`; gas scales with traffic, use batching |
-| `BatchStrategy` | `individual` (default) / `merkle` | individual: one record per tx, flushes share one EVM tx. merkle: one root per flush; verifiers need inclusion proofs |
-| `CadenceMode` | `per-tx` / `batch` (+`CadenceN`, `CadenceMaxWait`) / `interval` / `cron` (+`CadenceCron`) | WHEN flushes happen; independent of strategy |
+| Setting         | Options                                                                                   | Notes                                                                                                                                                              |
+| --------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CaptureMode`   | `opt-in` (default) / `all`                                                                | `all` anchors EVERY valid tx (non-opted ones with the empty-payload hash — existence proof); scope with `IncludeChaincodes`; gas scales with traffic, use batching |
+| `BatchStrategy` | `individual` (default) / `merkle`                                                         | individual: one record per tx, flushes share one EVM tx. merkle: one root per flush; verifiers need inclusion proofs                                               |
+| `CadenceMode`   | `per-tx` / `batch` (+`CadenceN`, `CadenceMaxWait`) / `interval` / `cron` (+`CadenceCron`) | WHEN flushes happen; independent of strategy                                                                                                                       |
 
 These are set in the channel config (step 3), so all peers agree; changing one is a
 channel-config update that hot-reloads the pipeline. Sane pairings: low-latency
@@ -209,13 +213,13 @@ compliance → `opt-in` + `individual` + `per-tx`; high-volume audit trail → `
 
 ## 9. Troubleshooting
 
-| Symptom | Likely cause |
-|---|---|
-| A peer refuses to join the channel / rejects the config | it's a vanilla binary (no `V2_5_MSTANCHOR` capability) or doesn't run `mstscc` — rebuild from this fork and enable the SCC |
-| Config-update rejected at apply time | `MSTAnchor` value without the capability, or a malformed/zero contract address / inconsistent cadence — run `peer mst preflight` |
-| Anchors land on MST but no ledger status; write-backs rejected | the write-back org lacks NodeOUs (peer-role gate fails closed), or `mst.writeback.*` is a client cert not the peer signcert — check the startup warning / `peer mst preflight` nodeous line |
-| Write-back endorses but fails with `FORBIDDEN ... Writers` from the orderer | the channel `Writers` policy excludes the peer role — add it, e.g. `OR('Org.admin','Org.client','Org.peer')`; `peer mst preflight` flags this on its `writers` line |
-| Peer refuses to anchor a channel | its declared `ChainID` doesn't match the peer's RPC chain — point `mst.evm.rpcURL` at the right node |
-| Peer refuses to start with `mstanchor:` error | incomplete `mst:` config or missing `MST_RELAYER_KEY` — intentional fail-fast |
-| Entries stuck PENDING, balance gauge low/absent | relayer account out of gas, or MST RPC unreachable (backoff retries automatically) |
-| Quarantine count rising | a chaincode emits malformed `MSTProofRequest` payloads — inspect the `q/` records; fix the emitter (use `proofhelper`) |
+| Symptom                                                                     | Likely cause                                                                                                                                                                                |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A peer refuses to join the channel / rejects the config                     | it's a vanilla binary (no `V2_5_MSTANCHOR` capability) or doesn't run `mstscc` — rebuild from this fork and enable the SCC                                                                  |
+| Config-update rejected at apply time                                        | `MSTAnchor` value without the capability, or a malformed/zero contract address / inconsistent cadence — run `peer mst preflight`                                                            |
+| Anchors land on MST but no ledger status; write-backs rejected              | the write-back org lacks NodeOUs (peer-role gate fails closed), or `mst.writeback.*` is a client cert not the peer signcert — check the startup warning / `peer mst preflight` nodeous line |
+| Write-back endorses but fails with `FORBIDDEN ... Writers` from the orderer | the channel `Writers` policy excludes the peer role — add it, e.g. `OR('Org.admin','Org.client','Org.peer')`; `peer mst preflight` flags this on its `writers` line                         |
+| Peer refuses to anchor a channel                                            | its declared `ChainID` doesn't match the peer's RPC chain — point `mst.evm.rpcURL` at the right node                                                                                        |
+| Peer refuses to start with `mstanchor:` error                               | incomplete `mst:` config or missing `MST_RELAYER_KEY` — intentional fail-fast                                                                                                               |
+| Entries stuck PENDING, balance gauge low/absent                             | relayer account out of gas, or MST RPC unreachable (backoff retries automatically)                                                                                                          |
+| Quarantine count rising                                                     | a chaincode emits malformed `MSTProofRequest` payloads — inspect the `q/` records; fix the emitter (use `proofhelper`)                                                                      |

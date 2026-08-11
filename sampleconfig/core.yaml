@@ -871,6 +871,9 @@ mst:
     # This peer's MST RPC endpoint. Its chain id is learned from the node at
     # startup and validated against each channel's declared chainID.
     rpcURL: http://127.0.0.1:8545
+    # DEV/TEST ONLY: skip TLS certificate verification for HTTPS/WSS RPC
+    # endpoints (accepts self-signed/unknown CAs).
+    insecureSkipTLSVerify: false
     # 0 = default (200000)
     gasLimit: 0
     # 0 = let the node suggest the priority fee
