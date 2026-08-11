@@ -55,9 +55,7 @@ func startMSTAnchoring(peerInstance *peer.Peer) (*mstanchor.Service, error) {
 			mstEndorserServer,
 			mstGatewayServer,
 			mstscc.Name,
-			cfg.WriteBack.MSPID,
-			cfg.WriteBack.CertPath,
-			cfg.WriteBack.KeyPath,
+			cfg.WriteBack,
 		)
 		if err != nil {
 			return nil, err

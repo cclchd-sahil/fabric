@@ -894,5 +894,10 @@ mst:
     mspID: ""
     certPath: ""
     keyPath: ""
+    # Optional: when the peer BCCSP.Default is VAULT, sign the write-back
+    # identity from the org Transit engine keyed by this username
+    # (<OrgName>_Transit/keys/<username>) instead of keyPath. certPath is still
+    # required and must match the Transit key. Ignored unless BCCSP=VAULT.
+    vaultUsername: ""
   # Serves /metrics (Prometheus text) and /healthz; empty disables.
   metricsAddr: ""

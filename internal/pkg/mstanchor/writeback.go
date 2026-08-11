@@ -6,6 +6,7 @@ SPDX-License-Identifier: Apache-2.0
 package mstanchor
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
@@ -22,7 +23,10 @@ import (
 	gp "github.com/hyperledger/fabric-protos-go/gateway"
 	mspproto "github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/hyperledger/fabric-protos-go/peer"
+	"github.com/hyperledger/fabric/bccsp"
+	"github.com/hyperledger/fabric/bccsp/sw"
 	"github.com/hyperledger/fabric/bccsp/utils"
+	"github.com/hyperledger/fabric/bccsp/vault"
 	"github.com/hyperledger/fabric/protoutil"
 
 	"github.com/hansrajrami/fabric/mst/relay/outbox"
@@ -75,8 +79,8 @@ var _ sender.WriteBack = (*LoopbackWriteBack)(nil)
 
 // NewLoopbackWriteBack loads the relayer identity and wraps the local
 // endorser (for endorsement) and gateway (for ordering + commit).
-func NewLoopbackWriteBack(endorser EndorserProcessor, gateway GatewayInvoker, chaincode, mspID, certPath, keyPath string) (*LoopbackWriteBack, error) {
-	signer, err := newIdentitySigner(mspID, certPath, keyPath)
+func NewLoopbackWriteBack(endorser EndorserProcessor, gateway GatewayInvoker, chaincode string, wb WriteBackConfig) (*LoopbackWriteBack, error) {
+	signer, err := newIdentitySigner(wb)
 	if err != nil {
 		return nil, err
 	}
@@ -234,30 +238,62 @@ func (w *LoopbackWriteBack) alreadyRecorded(ctx context.Context, channelID, fabr
 	return string(resp.GetResponse().GetPayload()) == "true", nil
 }
 
-// identitySigner is a minimal Fabric signing identity over a PEM cert/key
-// pair: SHA-256 + low-S ECDSA (Fabric rejects high-S signatures), creator =
-// the standard SerializedIdentity proto. It implements protoutil.Signer.
+// identitySigner is a minimal Fabric signing identity: SHA-256 + low-S ECDSA
+// (Fabric rejects high-S signatures), creator = the standard SerializedIdentity
+// proto. The private key is either loaded from a PEM file (key) or held in the
+// org's Vault Transit engine and signed remotely (csp+vaultKey). It implements
+// protoutil.Signer.
 type identitySigner struct {
 	creator []byte
-	key     *ecdsa.PrivateKey
+
+	// File-based key. Set when signing locally from a PEM key file.
+	key *ecdsa.PrivateKey
+
+	// Vault Transit-backed signing. Set when the write-back signs through the
+	// org Transit engine; the private key never leaves Vault.
+	csp      bccsp.BCCSP
+	vaultKey bccsp.Key
 }
 
 var _ protoutil.Signer = (*identitySigner)(nil)
 
-func newIdentitySigner(mspID, certPath, keyPath string) (*identitySigner, error) {
-	if mspID == "" || certPath == "" || keyPath == "" {
-		return nil, fmt.Errorf("mstanchor: write-back requires mst.writeback mspID, certPath, and keyPath")
+func newIdentitySigner(wb WriteBackConfig) (*identitySigner, error) {
+	if wb.MSPID == "" || wb.CertPath == "" {
+		return nil, fmt.Errorf("mstanchor: write-back requires mst.writeback mspID and certPath")
 	}
-	certPEM, err := os.ReadFile(certPath)
+	certPEM, err := os.ReadFile(wb.CertPath)
 	if err != nil {
 		return nil, fmt.Errorf("mstanchor: read write-back cert: %w", err)
 	}
-	creator, err := proto.Marshal(&mspproto.SerializedIdentity{Mspid: mspID, IdBytes: certPEM})
+	creator, err := proto.Marshal(&mspproto.SerializedIdentity{Mspid: wb.MSPID, IdBytes: certPEM})
 	if err != nil {
 		return nil, fmt.Errorf("mstanchor: serialize identity: %w", err)
 	}
 
-	keyPEM, err := os.ReadFile(keyPath)
+	// Vault Transit signing: only when a username is given AND the peer's BCCSP
+	// is Vault-backed. The private key stays in Vault, so no key file is needed;
+	// the cert is still required to present the identity and pass mstscc's
+	// peer-role gate.
+	if wb.VaultUsername != "" {
+		if wb.Vault == nil {
+			return nil, fmt.Errorf("mstanchor: mst.writeback.vaultUsername is set but the peer BCCSP is not configured with VAULT")
+		}
+		csp, key, err := newVaultWriteBackKey(wb.Vault, wb.VaultUsername)
+		if err != nil {
+			return nil, err
+		}
+		// A Transit signature would be rejected by MSP validation if it did not
+		// match the presented cert, so fail fast on a mismatch.
+		if err := assertCertMatchesKey(certPEM, key, wb.VaultUsername); err != nil {
+			return nil, err
+		}
+		return &identitySigner{creator: creator, csp: csp, vaultKey: key}, nil
+	}
+
+	if wb.KeyPath == "" {
+		return nil, fmt.Errorf("mstanchor: write-back requires mst.writeback.keyPath (or set mst.writeback.vaultUsername with a Vault-backed BCCSP)")
+	}
+	keyPEM, err := os.ReadFile(wb.KeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("mstanchor: read write-back key: %w", err)
 	}
@@ -270,6 +306,75 @@ func newIdentitySigner(mspID, certPath, keyPath string) (*identitySigner, error)
 		return nil, fmt.Errorf("mstanchor: parse write-back key: %w", err)
 	}
 	return &identitySigner{creator: creator, key: ecKey}, nil
+}
+
+// newVaultWriteBackKey builds a Vault Transit-backed BCCSP for the write-back
+// identity, keyed by username (the Transit key at <OrgName>_Transit/keys/<username>,
+// the same layout as the Vault BCCSP plugin), and fetches its key handle.
+func newVaultWriteBackKey(vc *VaultIdentityConfig, username string) (bccsp.BCCSP, bccsp.Key, error) {
+	security := vc.Security
+	if security == 0 {
+		security = 256
+	}
+	hash := vc.Hash
+	if hash == "" {
+		hash = "SHA2"
+	}
+	csp, err := vault.New(vault.VaultOpts{
+		Security:           security,
+		Hash:               hash,
+		Address:            vc.Address,
+		Token:              vc.Token,
+		OrgName:            vc.OrgName,
+		KeyStore:           username,
+		SoftwareVerify:     true,
+		InsecureSkipVerify: vc.InsecureSkipVerify,
+	}, sw.NewDummyKeyStore())
+	if err != nil {
+		return nil, nil, fmt.Errorf("mstanchor: init vault write-back signer: %w", err)
+	}
+	key, err := csp.GetKey(nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("mstanchor: fetch vault write-back key %q: %w", username, err)
+	}
+	if key == nil || !key.Private() {
+		return nil, nil, fmt.Errorf("mstanchor: vault write-back key %q is not a usable private key", username)
+	}
+	return csp, key, nil
+}
+
+// assertCertMatchesKey verifies the presented cert and the Vault Transit key are
+// the same keypair; otherwise every write-back signature would be rejected by
+// MSP validation.
+func assertCertMatchesKey(certPEM []byte, key bccsp.Key, username string) error {
+	block, _ := pem.Decode(certPEM)
+	if block == nil {
+		return fmt.Errorf("mstanchor: write-back cert is not PEM")
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return fmt.Errorf("mstanchor: parse write-back cert: %w", err)
+	}
+	certPub, ok := cert.PublicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return fmt.Errorf("mstanchor: write-back cert public key must be ECDSA, got %T", cert.PublicKey)
+	}
+	certDER, err := x509.MarshalPKIXPublicKey(certPub)
+	if err != nil {
+		return fmt.Errorf("mstanchor: marshal write-back cert public key: %w", err)
+	}
+	pub, err := key.PublicKey()
+	if err != nil {
+		return fmt.Errorf("mstanchor: vault write-back public key: %w", err)
+	}
+	keyDER, err := pub.Bytes()
+	if err != nil {
+		return fmt.Errorf("mstanchor: marshal vault write-back public key: %w", err)
+	}
+	if !bytes.Equal(certDER, keyDER) {
+		return fmt.Errorf("mstanchor: write-back cert public key does not match Vault Transit key %q; they must be the same keypair", username)
+	}
+	return nil
 }
 
 // parseECPrivateKey parses an ECDSA private key from DER in either PKCS#8
@@ -295,6 +400,10 @@ func (s *identitySigner) Serialize() ([]byte, error) { return s.creator, nil }
 
 func (s *identitySigner) Sign(msg []byte) ([]byte, error) {
 	digest := sha256.Sum256(msg)
+	if s.csp != nil {
+		// Vault Transit signs the prehashed digest and normalizes to low-S.
+		return s.csp.Sign(s.vaultKey, digest[:], nil)
+	}
 	sig, err := s.key.Sign(rand.Reader, digest[:], nil)
 	if err != nil {
 		return nil, err

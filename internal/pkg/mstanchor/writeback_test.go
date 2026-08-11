@@ -116,7 +116,7 @@ func writeBackFixture(t *testing.T, endorser EndorserProcessor, gateway GatewayI
 	require.NoError(t, os.WriteFile(certPath, certPEM, 0o600))
 	require.NoError(t, os.WriteFile(keyPath, keyPEM, 0o600))
 
-	wb, err := NewLoopbackWriteBack(endorser, gateway, "mstscc", "Org1MSP", certPath, keyPath)
+	wb, err := NewLoopbackWriteBack(endorser, gateway, "mstscc", WriteBackConfig{MSPID: "Org1MSP", CertPath: certPath, KeyPath: keyPath})
 	require.NoError(t, err)
 	return wb
 }
@@ -151,7 +151,7 @@ func TestNewIdentitySignerAcceptsKeyFormats(t *testing.T) {
 			require.NoError(t, os.WriteFile(certPath, certPEM, 0o600))
 			require.NoError(t, os.WriteFile(keyPath, pem.EncodeToMemory(tc.block), 0o600))
 
-			_, err := newIdentitySigner("Org1MSP", certPath, keyPath)
+			_, err := newIdentitySigner(WriteBackConfig{MSPID: "Org1MSP", CertPath: certPath, KeyPath: keyPath})
 			require.NoError(t, err)
 		})
 	}

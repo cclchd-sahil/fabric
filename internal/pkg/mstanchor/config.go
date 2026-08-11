@@ -89,15 +89,38 @@ type Config struct {
 	// through the peer's embedded gateway. The mst system chaincode requires a
 	// PEER-role identity (NodeOUs), so this must be the peer's own node
 	// signing identity, not a client cert.
-	WriteBack struct {
-		MSPID    string
-		CertPath string
-		KeyPath  string
-	}
+	WriteBack WriteBackConfig
 
 	// MetricsAddr serves /metrics and /healthz for the embedded relayer;
 	// empty disables it (the peer's operations endpoint is separate).
 	MetricsAddr string
+}
+
+// WriteBackConfig is the relayer's Fabric signing identity for RecordAnchor.
+// The cert (with MSPID) presents the identity; the private key is taken either
+// from KeyPath or, when VaultUsername is set and the peer BCCSP is Vault-backed,
+// from the org Transit engine (Vault) — in which case KeyPath is not required.
+type WriteBackConfig struct {
+	MSPID    string
+	CertPath string
+	KeyPath  string
+	// VaultUsername selects the Transit key (<OrgName>_Transit/keys/<username>)
+	// that signs this identity. Only honored when Vault is set (peer BCCSP=VAULT).
+	VaultUsername string
+	// Vault carries the peer's Vault BCCSP connection, populated only when
+	// peer.BCCSP.Default is VAULT.
+	Vault *VaultIdentityConfig
+}
+
+// VaultIdentityConfig is the subset of the peer's Vault BCCSP configuration the
+// write-back needs to sign its identity from the org Transit engine.
+type VaultIdentityConfig struct {
+	Address            string
+	Token              string
+	OrgName            string
+	InsecureSkipVerify bool
+	Security           int
+	Hash               string
 }
 
 // FromViper reads the mst.* section from the peer's configuration. With
@@ -148,6 +171,20 @@ func FromViper(v *viper.Viper) (*Config, error) {
 	c.WriteBack.MSPID = v.GetString("mst.writeback.mspID")
 	c.WriteBack.CertPath = v.GetString("mst.writeback.certPath")
 	c.WriteBack.KeyPath = v.GetString("mst.writeback.keyPath")
+	c.WriteBack.VaultUsername = v.GetString("mst.writeback.vaultUsername")
+	// When the peer's BCCSP is Vault-backed, capture the connection so the
+	// write-back can sign its identity from the org Transit engine (keyed by
+	// vaultUsername) instead of a key file.
+	if strings.EqualFold(v.GetString("peer.BCCSP.Default"), "VAULT") {
+		c.WriteBack.Vault = &VaultIdentityConfig{
+			Address:            v.GetString("peer.BCCSP.VAULT.Address"),
+			Token:              v.GetString("peer.BCCSP.VAULT.Token"),
+			OrgName:            v.GetString("peer.BCCSP.VAULT.OrgName"),
+			InsecureSkipVerify: v.GetBool("peer.BCCSP.VAULT.InsecureSkipVerify"),
+			Security:           v.GetInt("peer.BCCSP.VAULT.Security"),
+			Hash:               v.GetString("peer.BCCSP.VAULT.Hash"),
+		}
+	}
 
 	c.MetricsAddr = v.GetString("mst.metricsAddr")
 
